@@ -46,7 +46,7 @@ Before deploying this infrastructure, ensure you have:
 
 2. Deploy the stack using AWS CLI:
    ```
-   aws cloudformation create-stack --stack-name my-app-stack --template-body file://template.yaml --parameters ParameterKey=KeyName,ParameterValue=YourKeyPairName ParameterKey=DBPassword,ParameterValue=YourSecurePassword --capabilities CAPABILITY_IAM
+   aws cloudformation create-stack --stack-name my-app-stack --template-body file://temp.yaml --parameters ParameterKey=KeyName,ParameterValue=YourKeyPairName ParameterKey=DBPassword,ParameterValue=YourSecurePassword --capabilities CAPABILITY_IAM
    ```
 
 3. Replace `YourKeyPairName` with your EC2 KeyPair name and `YourSecurePassword` with a secure database password.
