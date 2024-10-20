@@ -1,0 +1,186 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "CloudFormation Template for EC2, RDS, and S3 with Docker setup"
+
+Parameters:
+  InstanceType:
+    Description: "EC2 instance type"
+    Type: String
+    Default: t2.medium
+  DBInstanceClass:
+    Description: "RDS instance type"
+    Type: String
+    Default: db.t3.medium
+  DBName:
+    Description: "Database Name"
+    Type: String
+    Default: "webappdb"
+  DBUser:
+    Description: "Database Username"
+    Type: String
+    Default: "admin"
+  DBPassword:
+    Description: "Database Password"
+    Type: String
+    NoEcho: true
+  DBAllocatedStorage:
+    Description: "Database Storage (GB)"
+    Type: Number
+    Default: 20
+  DBInstanceIdentifier:
+    Description: The database instance identifier
+    Type: String
+    Default: "mydb"
+  KeyName:
+    Description: "Name of an existing EC2 KeyPair to enable SSH access"
+    Type: AWS::EC2::KeyPair::KeyName
+
+Resources:
+  WebAppEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties: 
+      InstanceType: !Ref InstanceType
+      SecurityGroups: [!Ref EC2SecurityGroup]
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      ImageId: ami-0866a3c8686eaeeba # Amazon Ubuntu
+      KeyName: !Ref KeyName
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          sudo apt update -y
+          sudo apt install -y docker.io
+          sudo systemctl start docker
+          sudo usermod -aG docker $USER
+          sudo chmod 777 /var/run/docker.sock
+          sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          # Get RDS endpoint dynamically using AWS CLI (make sure the EC2 role has permissions)
+          DB_ENDPOINT=$(aws rds describe-db-instances --query 'DBInstances[?DBInstanceIdentifier==`mydb`].Endpoint.Address' --output text --region ${AWS::Region})
+          # Add error handling for the case where RDS is not ready
+          while [ -z "$DB_ENDPOINT" ]; do
+            echo "Waiting for RDS instance to be available..."
+            sleep 30
+            DB_ENDPOINT=$(aws rds describe-db-instances --query 'DBInstances[?DBInstanceIdentifier==`mydb`].Endpoint.Address' --output text --region ${AWS::Region})
+          done
+          # Pull and run the Docker image with correct environment variables
+          sudo docker pull tony06/voting-app:v1 # Replace with your actual app image
+          sudo docker run -d --name voting-app-container -e DB_HOST=$DB_ENDPOINT -e DB_USER=${DBUser} -e DB_PASS=${DBPassword} -p 8080:80 tony06/voting-app:v1
+          # Log success or failure
+          if [ $? -eq 0 ]; then
+            echo "Docker container started successfully."
+          else
+            echo "Failed to start Docker container." >&2
+          fi
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-EC2"
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref EC2Role]
+
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: EC2S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource: 
+                  - !Sub "arn:aws:s3:::${S3Bucket}"  # Bucket itself
+                  - !Sub "arn:aws:s3:::${S3Bucket}/*"  # Objects in the bucket
+
+              # Permissions to interact with RDS and EC2
+              - Effect: Allow
+                Action:
+                  - rds:DescribeDBInstances  # Permission to describe RDS instances
+                  - ec2:DescribeInstances  # Permission to describe EC2 instances
+                Resource: "*"  # "*" means it's not resource-specific, applied to all instances
+              
+              # Allow broader access to RDS resources if needed
+              - Effect: Allow
+                Action:
+                  - rds:*
+                Resource: "*"
+
+
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Allow HTTP, HTTPS, SSH, and database access"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0  # Allow HTTPS access
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0  # Allow SSH access from anywhere (consider restricting this)
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: 0.0.0.0/0  # Allow MySQL access from anywhere
+
+  MyRDSInstance:
+    Type: AWS::RDS::DBInstance
+    DependsOn: RDSDBSecurityGroup
+    Properties:
+      DBInstanceClass: !Ref DBInstanceClass
+      DBInstanceIdentifier: mydb
+      AllocatedStorage: !Ref DBAllocatedStorage
+      DBName: !Ref DBName
+      MasterUsername: !Ref DBUser
+      MasterUserPassword: !Ref DBPassword
+      Engine: MySQL
+      EngineVersion: 8.0.39
+      VPCSecurityGroups: 
+        - !GetAtt RDSDBSecurityGroup.GroupId
+
+  RDSDBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security group for RDS database"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: 0.0.0.0/0  # Allow MySQL access from anywhere (you can limit this to your EC2 instance's subnet if needed)
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-s3-bucket"
+  
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Statement:
+          - Action: s3:PutObject
+            Effect: Allow
+            Resource: !Sub "arn:aws:s3:::${S3Bucket}/*"
+            Principal:
+              AWS: !GetAtt EC2Role.Arn
