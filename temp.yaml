@@ -47,28 +47,48 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           sudo apt update -y
+          sudo snap install aws-cli --classic
           sudo apt install -y docker.io
           sudo systemctl start docker
           sudo usermod -aG docker $USER
           sudo chmod 777 /var/run/docker.sock
           sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
           sudo chmod +x /usr/local/bin/docker-compose
-          # Get RDS endpoint dynamically using AWS CLI (make sure the EC2 role has permissions)
-          DB_ENDPOINT=$(aws rds describe-db-instances --query 'DBInstances[?DBInstanceIdentifier==`mydb`].Endpoint.Address' --output text --region ${AWS::Region})
-          # Add error handling for the case where RDS is not ready
-          while [ -z "$DB_ENDPOINT" ]; do
-            echo "Waiting for RDS instance to be available..."
-            sleep 30
-            DB_ENDPOINT=$(aws rds describe-db-instances --query 'DBInstances[?DBInstanceIdentifier==`mydb`].Endpoint.Address' --output text --region ${AWS::Region})
+
+          # Set database credentials
+          AWS_REGION="${AWS::Region}"
+          DB_PASSWORD="${DBPassword}"
+          DB_USER="${DBUser}"
+
+          # Get RDS endpoint dynamically using AWS CLI
+          echo "Waiting for RDS instance to be available..."
+          while true; do
+              DB_ENDPOINT=$(aws rds describe-db-instances --query 'DBInstances[?DBInstanceIdentifier==`mydb`].Endpoint.Address' --output text --region $AWS_REGION)
+              if [ -n "$DB_ENDPOINT" ]; then
+                  echo "RDS endpoint found: $DB_ENDPOINT"
+                  break
+              fi
+              echo "RDS instance not ready yet. Retrying in 30 seconds..."
+              sleep 30
           done
-          # Pull and run the Docker image with correct environment variables
-          sudo docker pull tony06/voting-app:v1 # Replace with your actual app image
-          sudo docker run -d --name voting-app-container -e DB_HOST=$DB_ENDPOINT -e DB_USER=${DBUser} -e DB_PASS=${DBPassword} -p 8080:80 tony06/voting-app:v1
-          # Log success or failure
-          if [ $? -eq 0 ]; then
-            echo "Docker container started successfully."
+
+          # Pull and run the Docker image
+          echo "Pulling Docker image..."
+          sudo docker pull tony06/voting-app:v1
+
+          echo "Starting Docker container..."
+          sudo docker run -d --name voting-app-container \
+              -e DB_HOST=$DB_ENDPOINT \
+              -e DB_USER=$DB_USER \
+              -e DB_PASS=$DB_PASSWORD \
+              -p 8080:80 \
+              tony06/voting-app:v1
+
+          if [ "$(sudo docker ps -q -f name=voting-app-container)" ]; then
+              echo "Docker container started successfully."
           else
-            echo "Failed to start Docker container." >&2
+              echo "Failed to start Docker container." >&2
+              exit 1
           fi
       Tags:
         - Key: Name
