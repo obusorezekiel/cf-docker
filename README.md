@@ -15,11 +15,11 @@
 
 ## Project Overview
 
-This project uses AWS CloudFormation to deploy a robust infrastructure consisting of an EC2 instance running a Dockerized application, an RDS MySQL database, and an S3 bucket. The infrastructure is designed to support a Web Application hosted on the Docker Container with access to the RDS instance, and permissions to Upload, and Download files from an S3 Bucket.
+This project uses AWS CloudFormation to deploy a robust infrastructure consisting of an EC2 instance running a Dockerized application, an RDS MySQL database, and an S3 bucket. The infrastructure is designed to support a WordPress Application hosted on the Docker Container with access to the RDS instance, and permissions to Upload, and Download files from an S3 Bucket.
 
 ## Architectural Diagram
 
-![Architectural Diagram](./architectural_diagram.jpeg)
+![Architectural Diagram](./Architecture.jpeg)
 
 ## Architecture
 
@@ -97,6 +97,67 @@ To customize the deployment:
 2. Update the `UserData` section in the EC2 instance resource to use your own Docker image.
 3. Adjust the IAM roles and policies as needed for your specific application requirements.
 
+## Testing Script (`testing.py`)
+
+The `testing.py` script is designed to test the connectivity and functionality of the RDS (MySQL) database and S3 bucket created by the CloudFormation stack. Here's an explanation of its main components and functionality:
+
+### Dependencies
+
+The script uses the following Python libraries:
+- `boto3`: AWS SDK for Python, used for interacting with AWS services (S3 in this case)
+- `pymysql`: MySQL client library for Python, used for connecting to the RDS MySQL database
+- `os`: Used for file operations
+- `botocore.exceptions`: For handling AWS-specific exceptions
+
+### Configuration
+
+The script includes configuration variables for both RDS and S3:
+
+- RDS settings:
+  - `rds_endpoint`: The endpoint of your RDS instance
+  - `db_name`: Your database name
+  - `db_username`: Database username
+  - `db_password`: Database password (Note: In production, use secure methods to store credentials)
+  - `db_port`: Database port (default is 3306 for MySQL)
+
+- S3 settings:
+  - `bucket_name`: Name of your S3 bucket
+  - `file_name`: Name of the test file to be uploaded
+  - `file_content`: Content of the test file
+
+### Functions
+
+1. `test_rds_connection()`:
+   - Attempts to connect to the RDS MySQL database
+   - Creates a new database if it doesn't exist
+   - Creates a table named `employees`
+   - Inserts sample data into the table
+   - Prints success messages or error details
+
+2. `test_s3_upload()`:
+   - Creates a local test file
+   - Uploads the file to the specified S3 bucket
+   - Deletes the local file after upload
+   - Prints success messages or error details
+
+### Usage
+
+To run the testing script:
+
+1. Ensure you have the required Python libraries installed:
+   ```
+   pip install boto3 pymysql
+   ```
+
+2. Update the configuration variables in the script with your actual RDS and S3 details.
+
+3. Run the script:
+   ```
+   python testing.py
+   ```
+
+4. The script will attempt to connect to your RDS instance, create a database and table, and insert data. It will then try to upload a file to your S3 bucket.
+
 ## Troubleshooting
 
 1. **EC2 Instance Issues**:
@@ -128,3 +189,7 @@ Contributions to improve the template or documentation are welcome. Please fork 
 ---
 
 For any questions or issues, please open an issue in the project repository.
+
+
+
+

@@ -1,6 +1,6 @@
 # CloudFormation Template Documentation
 
-![Architectural Diagram](./architectural_diagram.jpeg)
+![Architectural Diagram](./Architecture.jpeg)
 
 ## Overview
 
@@ -78,7 +78,7 @@ The implemented architecture consists of the following main components:
      a. Updates the system and installs necessary packages
      b. Installs and configures Docker
      c. Waits for the RDS instance to be available
-     d. Pulls and runs the Docker image for the voting application
+     d. Pulls and runs the Docker image for the WordPress application
 
 3. **RDS Instance Setup**:
    - A MySQL database was created with the specified configuration
@@ -100,7 +100,7 @@ The implemented architecture consists of the following main components:
 
 1. **Network Configuration**: The template assumes a default VPC is available and does not create new network resources.
 
-2. **Docker Image**: The template assumes the existence of a Docker image (`tony06/voting-app:v1`) containing the voting application.
+2. **Docker Image**: The template assumes the existence of a WordPress Docker image (`wordpress:latest`) containing the Wordpress application.
 
 3. **Database Configuration**: The application is assumed to be compatible with MySQL and capable of using the specified environment variables for database connection.
 
@@ -112,32 +112,5 @@ The implemented architecture consists of the following main components:
 
 7. **Region Compatibility**: The AMI ID is region-specific. Ensure it's compatible with your chosen region or use a mapping to provide region-specific AMI IDs.
 
-## Recommendations for Production Use
 
-1. **VPC Configuration**: Set up a custom VPC with public and private subnets for better network isolation.
-
-2. **Security Hardening**: 
-   - Restrict security group rules to specific IP ranges or VPC CIDR blocks.
-   - Use SSL/TLS for database connections.
-   - Implement a bastion host for SSH access.
-
-3. **High Availability**: 
-   - Use an Auto Scaling group for EC2 instances.
-   - Set up RDS Multi-AZ deployment for database high availability.
-
-4. **Monitoring and Logging**: 
-   - Set up CloudWatch alarms for resource utilization.
-   - Implement centralized logging using CloudWatch Logs.
-
-5. **Backup and Disaster Recovery**: 
-   - Enable automated RDS backups.
-   - Implement a disaster recovery strategy, possibly using cross-region replication.
-
-6. **Cost Optimization**: 
-   - Use Reserved Instances for predictable workloads.
-   - Implement auto-scaling policies based on demand.
-
-7. **Secrets Management**: 
-   - Use AWS Secrets Manager or Systems Manager Parameter Store for managing database credentials and other secrets.
-
-By following these recommendations and understanding the design choices and assumptions, this infrastructure can be effectively deployed and managed in both development and production environments.
+By following these recommendations and understanding the design choices and assumptions, this infrastructure can be effectively deployed and managed in both development and testing environments

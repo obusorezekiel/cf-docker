@@ -74,17 +74,15 @@ Resources:
 
           # Pull and run the Docker image
           echo "Pulling Docker image..."
-          sudo docker pull tony06/voting-app:v1
 
-          echo "Starting Docker container..."
-          sudo docker run -d --name voting-app-container \
-              -e DB_HOST=$DB_ENDPOINT \
-              -e DB_USER=$DB_USER \
-              -e DB_PASS=$DB_PASSWORD \
-              -p 8080:80 \
-              tony06/voting-app:v1
+          sudo docker run --name wordpress-container -e WORDPRESS_DB_HOST=$DB_ENDPOINT:3306 \
+              -e WORDPRESS_DB_USER=$DB_USER \
+              -e WORDPRESS_DB_PASSWORD=$DB_PASSWORD \
+              -e WORDPRESS_DB_NAME=webappdb \
+              -p 80:80 -d wordpress
 
-          if [ "$(sudo docker ps -q -f name=voting-app-container)" ]; then
+
+          if [ "$(sudo docker ps -q -f name=wordpress-container)" ]; then
               echo "Docker container started successfully."
           else
               echo "Failed to start Docker container." >&2
