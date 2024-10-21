@@ -1,5 +1,7 @@
 # CloudFormation Template Documentation
 
+![Architectural Diagram](./architectural_diagram.jpeg)
+
 ## Overview
 
 This document outlines the implemented CloudFormation template that sets up a web application infrastructure on AWS. The infrastructure includes an EC2 instance running a Docker container, an RDS MySQL database, and an S3 bucket, designed to support a web application.
